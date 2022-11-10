@@ -1,0 +1,22 @@
+# Using RABE5.Rdata$P128
+rm(list=ls())
+load('RABE5.Rdata')
+install.packages("rgl")
+library(rgl)
+P128 <- read.table("P128.txt", header=TRUE)
+
+# check leverage points
+lm <- lm(Y~X1+X2+X3+X4+X5+X6, data=P128)
+lev <- influence(lm2)$hat
+plot(lev)
+
+# check influential points
+lm2 <- lm(Y~X1+X2+X3+X4+X5+X6, data=P128)
+cooks.d <- cooks.distance(lm2)
+plot(cooks.d)
+
+# check outliers
+lm2 <- lm(Y~X1+X2+X3+X4+X5+X6, data=P128)
+ri <- rstandard(lm2)
+plot(ri)
+identify(ri) # By using this code, we can identify exact numbers of outliers
