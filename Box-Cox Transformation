@@ -1,0 +1,20 @@
+# using RABE5$P184
+rm(list=ls())
+load('RABE5.Rdata')
+
+# 
+Y <- P184$BrainWeight
+X <- P184$BodyWeight
+plot(X,Y) # We cannot see linearity in this plot.
+
+# To solve this problem, we can use Box-Cox Transformation
+plot(X^0.5, Y^0.5) # When lambda of X,Y == 0.5
+plot(log(X),log(Y)) # When lambda == 0
+plot(X^-0.5,Y^-0.5) # When lambda == -0.5
+plot(X^-1, Y^-1)  # When lambda == -1
+
+# In these four plots, we have to compare which one shows linearity and no Heteroskedasticity.
+# lambda == 0 and lambda == -0.5 look good but when lambda is -0.5, we can know that points are concentrated around zero.
+# It means lambda == 0 is more appropriate.
+
+
