@@ -1,0 +1,25 @@
+# using RABE5$P176
+
+rm(list=ls())
+load('RABE5.Rdata')
+
+# check P176$X, P176$Y plot
+plot(P176$X, P176$Y)  # We can know that as X grows, Y grows too.
+
+# If we draw residual plot in this situation, we can see heteroskedasticity.
+# To solve this problem, we can use log transformation.
+plot(P176$X, log(P176$Y))
+c2 <- lm(log(Y)~X, data=P176)
+residuals <- rstandard(c2)
+plot(P176$X, residuals) # However, in this plot, we can see a pattern. 
+
+# To solve this problem, we can add new variable, X2.
+X2 <- P176$X^2
+c3 <- lm(log(Y)~X+X2, data=P176)
+
+Predicted <- predict(c3)
+residuals <- rstandard(c3)
+plot(Predicted, residuals) 
+plot(P176$X,residuals)
+plot(X2, residuals) # In these three plots, we can know that heteroskedasticity is removed.
+
