@@ -1,0 +1,50 @@
+# using RABE5$P198
+rm(list=ls())
+load('RABE5.Rdata')
+
+# By drawing plot, we can know that there is heteroscedasticity. (There is one isolated point)
+b1 <- lm(Y~X1+X2+X3, data=P198)
+plot(fitted(b1), rstandard(b1))   
+identify(fitted(b1), rstandard(b1)) # identify isolated point.
+
+# check influence and leverage 
+plot(influence(b1)$hat)  #leverage check
+identify(influence(b1)$hat) # result : 44, 49
+
+# check influential point
+plot(cooks.distance(b1)) 
+plot(dffits(b1)) # result : 49
+
+
+# As a result, point 49 is leverage and influential. However, point 44 is leverage not influential.
+
+## OLS without 44, 49
+b2 <- lm(b1, subset=-c(44,49))
+residuals <- b2$residuals   
+predicted <- fitted(b2)
+plot(predicted, rstandard(b2)) # still there is heteroscedasticity.
+plot(P198$Region[c(-44,-49)], rstandard(b2)) # still there is heteroscedasticity.
+
+# To remove heteroscedasticity, use WLS.
+
+## WLS without 44,49
+s1 <- sum(residuals[(P198$Region==1)]^2)/(9-1)   
+s2 <- sum(residuals[(P198$Region==2)]^2)/(12-1) 
+s3 <- sum(residuals[(P198$Region==3)]^2)/(16-1)
+s4 <- sum(residuals[(P198$Region==4)]^2, na.rm = TRUE)/(12-1) 
+
+## make weight
+P198$w[(P198$Region==1)] <- 1/s1 
+P198$w[(P198$Region==2)] <- 1/s2 
+P198$w[(P198$Region==3)] <- 1/s3
+P198$w[(P198$Region==4)] <- 1/s4 
+
+P198new <- P198[c(-44,-49),]
+b3 <- lm(Y~X1+X2+X3, data=P198new, weights=w)
+summary(b3) 
+predicted <- fitted(b3)
+residuals <- rstandard(b3)
+plot(predicted,residuals)
+plot(P198new$Region, residuals) # There is no heteroscedasticity.
+
+
