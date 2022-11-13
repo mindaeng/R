@@ -1,0 +1,40 @@
+# using RABE5$P219
+rm(list=ls())
+load('RABE5.Rdata')
+
+#
+lm1 <- lm(H~P, data=P219)
+summary(lm1)
+residuals <- rstandard(lm1)
+plot(residuals, type="o")
+abline(h=0, col=2)   # There is auto correlation.
+
+# Use DW-test
+acf(lm1$residuals, plot=FALSE)[1]
+
+# To figure out whether there is positive correlation or not, set hypothesis and test them.
+1) one-sided hypothesis
+H0 : p = 0, H1 : p > 0
+
+install.packages("randtests")
+library(randtests)
+runs.test(residuals, alternative="left.sided", threshold=0, plot=TRUE) # p-value = 0.001196 < a= 0.01 . So we can accept H1.
+
+2) two-sided hypothesis
+H0 : p = 0 , H1 : p != 0
+
+runs.test(residuals, alternative="two.sided", threshold = 0, plot = TRUE) #  p-value = 0.002393 * 2 = 0.004786 < a = 0.01 . So we can accept H1.
+
+
+# calculate dw and row hat. use these to test hypothesis.
+
+1) one-sided hypothesis
+
+acf(lm1$residuals, plot=FALSE)[1]
+install.packages("lmtest")
+library(lmtest)
+dwtest(lm1, alternative="greater") #  row hat = 0.651, DW : 0.62084 , p-value : 6.645e-06. Thus we can accept H1.
+
+2) two-sided hypothesis
+
+dwtest(lm1, alternative="two.sided") #  row hat = 0.651 , DW : 0.62084 , p-value = 1.329e-05. Thus we can accept H1.
