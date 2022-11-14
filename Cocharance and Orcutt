@@ -1,0 +1,20 @@
+# using RABE5$P219
+rm(list=ls())
+load('RABE5.Rdata')
+
+# To solve Correlation between Errors, use Cocharance and Orcutt.
+tH <- P219$H[2:25]-0.651*P219$H[1:24]
+tP <- P219$P[2:25]-0.651*P219$P[1:24]
+lm2 <- lm(tH~tP)
+summary(lm2) # B0 hat : -0.016473/1-rowhat =  -0.016473/0.349 = -0.04720057, B1 hat : 0.066243 
+
+# check whether there is Autocorrelation or not.
+acf(lm2$residuals, plot=FALSE)[1] # result : -0.275. So we can guess that there is negative correlation.
+
+# To check whether [H1 : row < 0] or not, set alternative="less" .
+dwtest(lm2, alternative="less") #  p-value = 0.2315 > 0.05 . So we cannot reject [H0: row = 0].
+
+#
+residuals <- rstandard(lm2)
+plot(residuals, type="o")
+abline(h=0, col=2) # we can know that residual correlation problem has been solved.
