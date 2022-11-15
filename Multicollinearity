@@ -1,0 +1,32 @@
+# using RABE5$P248
+rm(list=ls())
+load('RABE5.Rdata')
+dat <- P248
+
+# considering "symptom" & "numerical measures", we can check whether there is Multicollinearity or not.
+# symptom
+lm1 <- lm(St~., data=dat)
+summary(lm1) ## At, At.1, Pt.1' p-value > a . It means that there can be Multicollinearity.
+
+# Numerical measures
+
+# (1) corr.coeff.matrix 
+cor(P248[,-1]) 
+pairs(P248[,-1], pch=19)
+
+# (2) VIF
+library(car)
+vif(lm1) ; mean(vif(lm1)) 
+
+## The result of VIF shows that the values of At, Pt, At.1, Pt.1 are over 10 and [avg = 28.18552] > 10.
+## It means there can be Multicollinearity.
+
+# (3) eigenvalue and eigenvector
+eigen(cor(P248[,-1]))
+
+install.packages("remotes")
+remotes::install_github("cran/perturb")
+library(perturb)
+
+# (3-1) condition index and collinearity diagnostics
+colldiag(lm1, center=T, scale=T)  ## [condition number = 15.295] > 15. So there can be Multicollinearity.
