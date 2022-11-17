@@ -1,0 +1,28 @@
+# using RABE5$P060
+load('RABE5.Rdata')
+
+install.packages("leaps")
+library(leaps)
+install.packages("mixlm")
+library(mixlm)
+install.packages("MASS")
+library(MASS)
+install.packages("faraway")
+library(faraway)
+
+# forward selection
+lm1 <- lm(Y~., data=P060)
+forward(lm1, alpha = 0.3, full=TRUE)
+forward(lm1, alpha=0.97, full=TRUE)
+
+# backward selection
+backward(lm1, alpha=0.3, full=TRUE)
+
+# stepwise selection
+stepWise(lm1, alpha.enter = 0.3, alpha.remove = 0.3, full = TRUE)
+
+# another way of forward, backward, stepwise selection
+full <- lm(Y~., data=P060)
+step(base, scope=list(upper=full), direction = "forward") # forward selection
+step(full, direction = "backward") # backward selection
+step(base, scope = list(upper=full), direction = "both") # stepwise selection
