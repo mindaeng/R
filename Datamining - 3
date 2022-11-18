@@ -1,0 +1,58 @@
+rm(list=ls())
+
+dat <-  read.csv(file="C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/과제/과제3/hw3.csv")
+
+library(doParallel)
+library(ggplot2)
+library(caret)
+install.packages("glmnet")
+library(glmnet)
+
+
+set.seed(100)
+x = model.matrix(tumor_type ~ ., dat)[ ,-1]
+y = dat$tumor_type
+nrow(x)
+train = sample(1:nrow(x), 0.594*nrow(x))
+test = (-train)
+y.test = y[test]
+x.train = x[train, ]
+x.test = x[test, ]
+y.train = y[train]
+
+enet = glmnet(x[train, ], y[train], alpha=0.5, lambda = grid)
+
+set.seed(1)
+cv.outenet = cv.glmnet(x[train, ], y[train], alpha=0.5)
+bestlamenet = cv.outenet$lmbda.min
+enet.pred = predict(enet, s=bestlamenet, newx = x[test, ])
+mean((enet.pred-y.test)^2)
+out.enet = glmnet(x,y,alpha = 0.5, lambda = grid)
+enet.coef = predict(out.enet, type = "coefficients", s=bestlam)[1:14, ]
+
+
+nc = detectCores()
+registerDoParallel(nc)
+
+myControl = trainControl(method='cv', number = 10, allowParallel = T, savePredictions = "final")
+
+set.seed(10)
+fit = train(x.train, y.train, method="glmnet", trControl = myControl, tuneLength = 3, preProcess = c("center", "scale"))
+fit$bestTune
+
+pred=predict.train(fit,x.test)
+mean((y.test-pred)^2)
+myGrid = expand.grid(alpha = seq(0,1,by = 0.05), lambda = seq(0,5,length=20))
+
+set.seed(100)
+fit = train(x.train, y.train, method = "glmnet", trControl = myControl, tuneGrid = myGrid, metric = "RMSE", preProcess = c("center", "scale"))
+fit$bestTune
+
+bT = fit$bestTune
+pred = predict(fit, x.test)
+mean((y.test- pred)^2)
+
+fitb = glmnet(x.train, y.train, alpha=bT$alpha, lambda = bT$lambda)
+predict(fitb, type="coefficient")[, 1]
+
+fit$bestTune
