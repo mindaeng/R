@@ -1,0 +1,35 @@
+dat <-  read.csv(file="C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/중간/mid-1.csv", header=T, stringsAsFactors=T)
+library(tree)
+str(dat)
+
+
+
+dat<-na.omit(dat)
+dat$Y <- factor(dat$Y)
+
+
+n <- dim(dat)[1]
+set.seed(12)
+train <- sample(n, n/2)
+
+htree <- tree(Y~., data = dat[train, ])
+plot(htree) 
+text(htree,pretty=T)
+htree
+
+punp=predict(htree, dat[-train,])
+pcl = ifelse(punp[,2]>1/2, "Yes" , "No")
+mean(pcl==dat$Y[-train])
+
+
+cv.h <- cv.tree(htree, FUN = prune.misclass)
+plot(cv.h$size,cv.h$dev,type='b')
+prune.h <- prune.misclass(htree, best = 6)
+plot(prune.h) 
+text(prune.h)
+prune.h
+
+
+pp = predict(prune.h,dat[-train,])
+pclp=ifelse(pp[,2]>1/2, "Yes", "No")
+mean(pclp==dat$Y[-train])
