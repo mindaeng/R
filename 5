@@ -1,0 +1,68 @@
+rm(list=ls())
+
+
+# 데이터마이닝 HW5
+
+# Use your CAU id as a seed value and split mid-1.csv  into 50% training set and 50% test set. 
+
+dat <-  read.csv(file="C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/중간/mid-1.csv", header=T, stringsAsFactors=T)
+
+
+# (1) Construct a random forest model. Report the optimal tuning parameter(s) and test error estimate.
+
+
+library(MASS)
+library(caret)
+library(doParallel)
+nc=detectCores()
+registerDoParallel(nc)
+dat$X <- NULL
+hdata <- na.omit(dat)
+n <- dim(hdata)[1]
+library(randomForest)
+set.seed(20196315)
+train <- sample(n, n/2)
+htrain <- hdata[train, ]
+htest <- hdata[-train, ]
+set.seed(20196315)
+
+
+
+mycontrol=trainControl(method="cv", number=10, classProbs = T, allowParallel = T, savePredictions = "final")
+set.seed(20196315)
+hrf = train(Y~., data=hdata, method="rf", trControl=mycontrol, tuneLength=7)
+hrf
+
+
+
+bag.h <- randomForest(Y ~ ., data = htrain, mtry = 8, importance = T)
+bag.h
+yhat.bag <- predict(bag.h, newdata = htest)
+mean(yhat.bag != htest$Y)
+
+
+# (2) Construct a gradient boosting model. Report the optimal tuning parameter(s) and test error estimate.
+library(gbm)
+n <- dim(hdata)[1]
+set.seed(20196315)
+train <- sample(n, n/2)
+fitgbm <- gbm(Y ~ ., data = hdata[train, ], cv.folds = 10,
+              n.tree = 100, distribution = "multinomial")
+best.iter <- gbm.perf(fitgbm, method = "cv")
+predgbm <- predict(fitgbm, hdata[-train, ], best.iter, type = "response")
+head(predgbm)
+pclgbm <- apply(predgbm, 1, which.max)
+table(pclgbm, hdata$Y[-train])
+
+
+
+mycontrol = trainControl(method = "cv", number = 10, savePredictions = "final",
+                         classProbs = T, allowParallel = T)
+set.seed(20196315)
+fit_gbm = train(Y ~ ., data = hdata[train, ], method = "gbm",
+                trControl = mycontrol, tuneLength = 3, preProc = c("center",
+                                                                   "scale"), verbose = F)
+pred_gbm = predict(fit_gbm, hdata[-train, ])
+table(pred_gbm, hdata$Y[-train])
+
+mean(pred_gbm != hdata$Y[-train])
