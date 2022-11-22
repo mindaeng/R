@@ -1,0 +1,91 @@
+# Use your CAU id as a seed value and split mid-1.csv  into 50% training set and 50% test set. 
+
+#Construct a stacking model to predict the binary response Y using at least 5 base learners.
+#Compare and report the test accuracies of the base learners and the stacking method.
+
+
+
+rm(list=ls())
+
+dat <-  read.csv(file="C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/중간/mid-1.csv", header=T, stringsAsFactors=T)
+
+
+library(caret)
+library(caretEnsemble)
+library(doParallel)
+
+
+dat1 = na.omit(dat)
+n = dim(dat1)[1]
+n
+
+set.seed(20196315)
+train = sample(n, n/2)
+htrain = dat1[train, ]
+htest = dat1[-train, ]
+dim(dat1)
+
+X.train = htrain[, -1]
+X.test = htest[, -1]
+y.train = htrain[, 1]
+y.test = htest[, 1]
+
+my.control = trainControl(method = "cv", number = 10, savePredictions = "final",
+                          allowParallel = TRUE, classProbs = TRUE)
+set.seed(20196315)
+hmodel = caretList(Y ~ ., data = htrain, methodList = c("rf",
+                                                          "glm", "naive_bayes"), metric = "Accuracy", trControl = my.control)
+hmodel$rf
+
+hmodel$glm
+
+
+hmodel$naive_bayes
+
+
+pc_hrf = predict.train(hmodel$rf, X.test)
+pc_hglm = predict.train(hmodel$glm, X.test)
+pc_hnb = predict.train(hmodel$naive_bayes, X.test)
+acc = function(x, y) mean(x == y)
+acc(pc_hrf, y.test)
+
+
+acc(pc_hglm, y.test)
+
+acc(pc_hnb, y.test)
+
+z1 = hmodel$rf$pred[order(hmodel$rf$pred$rowIndex), ]$Yes 
+#CV posterior probability with,→ the same index order
+
+z2 = hmodel$glm$pred[order(hmodel$glm$pred$rowIndex), ]$Yes
+z3 = hmodel$naive_bayes$pred[order(hmodel$naive_bayes$pred$rowIndex),
+]$Yes
+Z.train = data.frame(z1 = z1, z2 = z2, z3 = z3)
+Z.test = data.frame(z1 = predict.train(hmodel$rf, X.test, "prob")$Yes,
+                    z2 = predict.train(hmodel$glm, X.test, "prob")$Yes, z3 =
+                       predict.train(hmodel$naive_bayes,
+                                       X.test, "prob")$Yes)
+
+set.seed(20196315)
+hens1 = caretEnsemble(hmodel, metric = "Accuracy", trControl = my.control)
+
+pc_hens1 = predict(hens1, X.test)
+acc(pc_hens1, y.test)
+
+
+res = data.frame(rf = acc(pc_hrf, y.test), glm = acc(pc_hglm,
+                                                     y.test), naive_bayes = acc(pc_hnb, y.test), stacking1 = acc(pc_hens1,y.test))
+
+
+
+
+set.seed(20196315)
+hens2 = caretStack(hmodel, method = "glmnet", metric = "Accuracy",
+                   trControl = my.control, tuneLength = 5)
+
+pc_hens2 = predict(hens2, X.test)
+acc(pc_hens2, y.test)
+
+
+res$stack_elastic_net = acc(pc_hens2, y.test)
+res
