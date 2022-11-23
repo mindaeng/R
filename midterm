@@ -1,0 +1,477 @@
+rm(list=ls())
+
+library(dplyr)
+dat <-  read.csv(file="C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/중간/mid-1.csv",stringsAsFactors=T)
+head(dat)
+str(dat)
+table(dat$Y)
+n = dim(dat)[1]
+n
+train = sample(1:n, n/2)
+dat.train <- dat[train,]
+dat.test <- dat[-train,]
+dat = dat %>% mutate_if(is.character, as.factor)
+
+
+dat
+
+plot(dat.train[,1:21])
+
+set.seed(20196315)
+
+
+
+
+
+# Use mid-1.csv data to answer the following questions. In the data, Y is a binary response variable. 
+# Split the data into 50% training set and 50% test set.
+
+
+##(a) Construct LDA, QDA, naive Bayes, logit model, elastic net, and knn classifiers using the training set. 
+## If a model includes tuning parameter(s), then apply 10-fold CV to estimate the optimal tuning parameter(s) 
+## and report the optimal values.
+
+
+
+library(MASS)
+
+dat1<-dat[,c(0:21)]
+attach(dat1)
+dat1
+
+
+
+#QDA 
+fit2<-qda(Y~X1+X3+X4+X5+X6+X7+X8+X9+X10+X11+X13+X14+X15+X17+X18+X19+X20,data=dat1,subset=train)
+pred.qda<-predict(fit2,dat1[-train,])$class
+table(pred.qda,dat1[-train,1])
+
+mean(pred.qda!=dat1[-train,1])
+
+
+#LDA
+fit<-lda(Y~X1+X3+X4+X5+X6+X7+X8+X9+X10+X11+X13+X14+X15+X17+X18+X19+X20,data=dat1,subset=train)
+pred.lda<-predict(fit,dat1[-train,])$class
+table(pred.lda,dat1[-train,1])
+mean(pred.lda!=dat1[-train,1])
+
+
+
+dat1.train<- dat1[train,]
+library(caret)
+
+set.seed(20196315)
+fold=createFolds(dat1.train[,21],k=10,returnTrain = T)
+myControl=trainControl(method="cv",number=10,allowParallel=T,index=fold)
+
+dat1.train[,2:21]
+fit.lda=train(dat1.train[,c(2,4,5,6,7,8,9,10,11,12,14,15,16,18,19,20,21)],dat1.train[,1],method="lda",trControl=myControl)
+fit.qda=train(dat1.train[,c(2,4,5,6,7,8,9,10,11,12,14,15,16,18,19,20,21)],dat1.train[,1],method="qda",trControl=myControl)
+
+fit.lda
+fit.qda
+
+# lda 선택 accuaracy : 0.9375 / qda = 0.9027778
+
+
+
+#naive Bayes
+dat1.train<- dat1[train,]
+dat1.test <- dat1[-train, ]
+
+library(caret)
+library(e1071)
+
+fit<-naiveBayes(Y~.,data=dat1.train)
+pred.dat1<-predict(fit,dat1.test)
+table(pred=pred.dat1,true=dat1.test[,1])
+mean(pred.dat1!=dat.test[,1])
+
+
+#logit model
+
+#bino
+
+fitb<-glm(Y~.,data=dat,family=binomial)
+summary(fitb)
+predict(fitb,data.frame(Y=c("Yes","No"),X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X13+X14+X15+X16+X17+X18+X19+X20, type="response")
+
+
+
+# multi
+n=dim(dat)[1]
+set.seed(1)
+train=sample(n,n/2)
+dat.train=dat[train,]
+dat.test=dat[-train,]
+library(nnet)
+datm=multinom(Y~.,data=dat.train)
+summary(datm)
+predm=predict(datm,dat.test)
+predm
+mean(predm==dat.test$Y)
+
+
+
+#
+datb<-dat[dat$Y!="No",c(1:21)]
+
+datb$zero<-rep(0,dim(datb)[1])
+datb$zero[datb$Y=="No"]<- 1
+n<-dim(datb)[1]
+set.seed(20196315)
+train <- sample(1:n,n/2)
+datb = datb %>% mutate_if(is.character, as.factor)
+datb.train <- datb[train,]
+datb.test <- datb[-train,]
+fit<-glm(Y~.,family='binomial', data=dat[train,])
+summary(fit)
+
+b<-c(coef(fit))
+pred <- predict(fit,newdata=dat.test,type="response")
+pcls <- round(pred)
+table(pred=pcls,true=datb$Y[-train])
+mean(pcls != datb$Y[-train])
+
+#chae
+
+dat$zero <- rep(0, dim(dat)[1])
+dat$zero[dat$Y=="No"] <- 1
+
+n=dim(dat)[1]
+set.seed(1)
+train <- sample(1:n, n/2)
+
+fita<-glm(Y~., family='binomial',data=dat[train,])
+summary(fita)
+b<-c(coef(fita))
+pred<-predict(fita, newdata=dat.test, type='response')
+pcls <- round(pred)
+table(pred=pcls, ture=dat$zero[-train])
+
+mean(pcls!=dat$zero[-train])
+
+
+
+# regularization of logit
+
+update.packages('Rcpp')
+library(Rcpp)
+
+hdat = na.omit(dat)
+x = model.matrix(Y ~ ., data = hdat)[, -1]
+y = hdat$Y
+n = nrow(x)
+set.seed(1)
+train = sample(n, n/2)
+x.train = x[train, ]
+x.test = x[-train, ]
+y.train = y[train]
+y.test = y[-train]
+
+mycontrol = trainControl(method = "cv", number = 10, allowParallel = T, classProbs = T)
+set.seed(1)
+hfit = train(x.train, y.train, method = "glmnet", trControl = mycontrol, tuneLength = 3, family = "binomial", PreProcess = c("center", "scale"))
+
+hfit
+
+hpred = predict(hfit, x.test)
+hpred
+mean(y.test != hpred) 
+
+
+
+#
+
+hdat = na.omit(dat)
+x = model.matrix(Y ~ ., data = hdat)[, -1]
+y = hdat$Y
+n = nrow(x)
+set.seed(1)
+train = sample(n, n/2)
+x.train = x[train, ]
+x.test = x[-train, ]
+y.train = y[train]
+y.test = y[-train]
+
+fitb<-glm(Y~X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X12+X13+X14+X15+X16+X17+X18+X19+X20, data=hdat, family=binomial)
+predict(fitb,data.frame(x[train,],y[train]),type = "response")
+predict(fitb,data.frame(Y=c("Yes","No"),X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X12+X13+X14+X15+X16+X17+X18+X19+X20,type="response")
+
+
+
+#
+n=dim(dat)[1]
+set.seed(20196315)
+train=sample(n,n/2)
+dat.train=dat[train,]
+dat.test=dat[-train,]
+library(nnet)
+fitm=multinom(Y~.,data=dat.train)
+summary(fitm)
+
+
+predm=predict(fitm,dat.test)
+predm
+
+mean(predm==dat.train$Y)
+
+
+
+
+# Ridge
+f = glmnet(x.train, y.train, alpha = 0, lambda = 1, family = "binomial")
+f.out = cv.glmnet(x.train, y.train, alpha = 0, family = "binomial")
+f.out$lambda.min
+
+fit0 = glmnet(x.train, y.train, alpha = 0, family = "binomial")
+predict(fit0, type = "coefficients", s = f.out$lambda.min)[1:21, ]
+
+
+
+
+
+
+
+datb<-dat[dat$Y!="NO",2:21]
+datb$Y<-rep(0,dim(datb)[1])
+datb$Y[datb$Y=="NO"]<-1
+n<-dim(dat)[1]
+set.seed(1)
+train <- sample(1:n,n/2)
+fit<-glm(Y~.,data=datb[train,],family=binomial)
+summary(fit)
+b<-c(coef(fit))
+pred <- predict(fit,newdata=datb[-train,],type="response")
+pcls <- round(pred)
+table(pred=pcls,true=datb$Y[-train])
+mean(pcls != datb$Y[-train])
+
+fitb<-glm(Y~.,data=datb,family=binomial)
+summary(fitb)
+
+
+
+
+# elastic nets
+
+library(caret)
+library(glmnet)
+library(doParallel)
+library(MASS)
+library(glmnet)
+x = model.matrix(Y ~ ., dat)[, -1]
+y = dat$Y
+nrow(x)
+train = sample(nrow(x), 0.5 * nrow(x))
+test = (-train)
+x.train = x[train, ]
+x.test = x[test, ]
+y.train = y[train]
+y.test = y[test]
+nc = detectCores()
+registerDoParallel(nc)
+library(caret)
+out.enet = glmnet(x, y, alpha = 0.5, lambda = grid)
+enet.coef = predict(out.enet, type = "coefficients", s = bestlam)[1:21, ]
+enet.coef
+myControl = trainControl(method = "cv", number = 10, allowParallel = T, savePredictions = "final")
+set.seed(20196315)
+fit = train(x.train, y.train, method = "glmnet", trControl = myControl, tuneLength = 3, preProcess = c("center", "scale"))
+fit
+fit$bestTune
+pred = predict.train(fit, x.test)
+mean((y.test - pred)ˆ2)
+myGrid = expand.grid(alpha = seq(0, 1, by = 0.05), lambda = seq(0, 5, length = 20))
+set.seed(20196315)
+fit = train(x.train, y.train, method = "glmnet", trControl = myControl, tuneGrid = myGrid, metric = "RMSE", preProcess = c("center", "scale"))
+fit$bestTune
+bT = fit$bestTune
+pred = predict(fit, x.test)
+mean((y.test - pred)ˆ2)
+
+
+
+
+x = model.matrix(Y ~ ., dat)[, -1]
+y = dat$Y
+nrow(x)
+
+set.seed(100)
+train = sample(1:nrow(x), 0.5*nrow(x))
+test = (-train)
+y.test = y[test]
+LASSO.mod = glmnet(x[train, ], y[train], alpha = 1, lambda = grid)
+LASSO.pred = predict(LASSO.mod, s = 4, newx = x[test, ])
+mean((LASSO.pred - y.test)ˆ2)
+
+
+
+train = sample(1:n, n/2)
+x=model.matrix(Y~X1+X2+X3+X4+X5+X6+X7+X8+X9+X10+X11+X13+X14+X15+X16+X17+X18+X19+X20, data=dat)[, 1]
+head(x)
+y = dat$Y
+n = nrow(x)
+n
+x.train = x[train, ]
+x.test = x[-train, ]
+y.train = y[train]
+y.test = y[-train]
+nc = detectCores()
+registerDoParallel(nc)
+
+enet = glmnet(dat[train, ], dat[train], alpha = 0.5, lambda = grid)
+
+
+
+mycontrol = trainControl(method="cv", number=10, allowParallel=T, savePredictions='final', classProbs=T, search="grid")
+fit = train(x.train, y.train, method = "glmnet", trControl = myControl, tuneLength = 3, preProcess = c("center", "scale"))
+
+fit
+fit$bestTune
+pred = predict.train(fit, x.test)
+mean((y.test - pred)ˆ2)
+
+
+myGrid = expand.grid(alpha=seq(0, 1, by=0.05), lambda=exp(seq(-2, 1, length=10)))
+set.seed(10)
+dfit=train(x.train, y.train, method='glmnet', trControl=mycontrol, tuneGrid=myGrid, family="binomial",PreProcess = c('center', 'scale'))
+dfit
+
+dpred=predict(dfit, x.test)
+dpred
+predict(dfit, x.test, type="prob")[1:10, ]
+dfit$bestTune
+d = glmnet(x.train, y.train, alpha=dfit$bestTune[1], family='binomial', lambda=dfit$bestTune[2])
+coef(d)[,1]
+
+mean(y.test != dpred)
+
+
+enet = glmnet(x[train, ], y[train], alpha = 0.5, lambda = grid)
+
+
+
+# knn
+
+
+is.na(dat)
+library(class)
+set.seed(20196315)
+n<-dim(dat)[1]
+n
+train<-sample(n,n/2)
+dat.train=dat[train,]
+dat.test=dat[-train,]
+error<-numeric()
+
+error.cv<-numeric()
+
+for (i in 2:21){
+  error.cv[i]<-mean(knn.cv(dat.train[,2:21],dat.train[,21],k=i)!=dat.train[,21])
+}
+error.cv
+
+
+
+library(caret)
+library(doParallel)
+nc=detectCores()
+registerDoParallel(nc)
+
+mycontrol=trainControl(method="cv",number=10,classProbs=T, allowParallel = T, savePredictions = "final")
+set.seed(20196315)
+fitknn=train(dat.train[,2:21],dat.train[,21],method="knn",tuneGrid=expand.grid(k=10))
+fitknn
+fitknn$bestTune
+predknn=predict(fitknn,dat.test)
+mean(predknn==dat.test$Y)
+
+mean(knn(dat.train[,2:21],dat.test[,2:21],dat.train[,21],k=10)!=dat.train[,21])
+
+
+mean(knn.cv(dat.train[,1:4],dat.train[,5],k=10)!=dat.train[,5])
+error.cv[10]<-mean(knn.cv(dat.train[,1:21],dat.train[,1:21],k=10)!=dat.train[,5])
+error.cv
+
+na.omit(dat)
+dat<-subsetData(dat)
+dat_row=apply(dat,1,mean)
+dat<-dat[dat_row!=0,]
+
+mycontrol=trainControl(method="cv",number=10,classProbs=T)
+set.seed(1234)
+fitknn=train(dat.train[,1:4],dat.train[,5],method="knn",tuneGrid=expand.grid(k=1:10))
+fitknn
+
+
+
+library(caret)
+library(glmnet)
+library(doParallel)
+nc = detectCores()
+registerDoParallel(nc)
+dat$X = NULL
+dat = na.omit(dat)
+x = model.matrix(Y ~ ., data = dat)[, -1]
+y = dat$Y
+n = nrow(x)
+set.seed(1)
+train = sample(n, n/2)
+x.train = x[train, ]
+x.test = x[-train, ]
+y.train = y[train]
+y.test = y[-train]
+# Grid search
+mycontrol = trainControl(method = "cv", number = 10, allowParallel = T, classProbs = T,
+                         search = "grid")
+myGrid = expand.grid(alpha = seq(0, 1, by = 0.2), lambda = exp(seq(-2, 1, length = 5)))
+set.seed(1)
+hfit = train(x.train, y.train, method = "glmnet", trControl = mycontrol, tuneGrid = myGrid, family = "binomial", PreProcess = c("center", "scale"))
+
+hfit
+
+#
+set.seed(17)
+library(ISLR)
+k = 10
+kfcv.error = rep(0, 10)
+for (i in 1:k) {
+  glm.fit = glm(Y ~ ., i), data = dat)
+  kfcv.error[i] = cv.glm(Auto, glm.fit, K = k)$delta[1]
+}
+kfcv.error
+
+
+
+
+set.seed(1)
+train <- sample(1:n, n/2)
+train
+library(boot)
+
+
+#knn
+
+k <- 10
+n <- dim(Auto)[1]
+folds <- sample(1:k, n, replace = T, prob = rep(1/k, k))
+# OR
+ind <- (1:n)%%k + 1
+folds <- sample(ind, n)
+kmse <- matrix(0, ncol = 10, nrow = k)
+nd <- 10
+library(doParallel)
+nc <- detectCores()
+registerDoParallel(nc)
+cvp <- foreach(i = 1:k) %dopar% {
+  cvmse <- numeric(nd)
+  for (j in 1:nd) {
+    fit <- lm(Y ~ poly(x, j), data = dat[folds != i, ])
+    pred <- predict(fit, newdata = dat[folds == i, ])
+    cvmse[j] <- mean((pred - dat$mpg[folds == i])ˆ2)
+  }
+  cvmse
+}
+for (i in 1:k) kmse[i, ] <- cvp[[i]]
+apply(kmse, 2, mean)
