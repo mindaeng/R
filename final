@@ -1,0 +1,280 @@
+rm(list=ls())
+
+# 1 
+
+
+dat1 <-  read.csv(file="C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/기말/Qdata.csv", header=T, stringsAsFactors=T)
+dat2 <- read.csv(file="C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/기말/Adata.csv", header=T, stringsAsFactors=T)
+
+#  Construct your best classifier to predict the binary response Y , 
+
+# 1. tree
+
+# classification trees
+
+
+library(tree)
+str(dat1)
+
+
+dat1<-na.omit(dat1)
+dat1$y <- factor(dat1$y)
+
+
+n <- dim(dat1)[1]
+set.seed(20196315)
+train <- sample(n, n/2)
+
+htree1 <- tree(y~., data = dat1[train, ])
+plot(htree1) 
+text(htree1,pretty=T)
+htree1
+
+punp=predict(htree1, dat1[-train,])
+pcl = ifelse(punp[,2]>1/2, "Yes" , "No")
+mean(pcl==dat1$y[-train]) # 0.8119658
+
+
+# pruning trees
+
+set.seed(20196315)
+cv.h <- cv.tree(htree1, FUN = prune.misclass)
+plot(cv.h$size,cv.h$dev,type='b')
+
+prune.h <- prune.misclass(htree1, best = 3)
+plot(prune.h) 
+text(prune.h)
+
+
+
+pp = predict(prune.h,dat1[-train,])
+pclp=ifelse(pp[,2]>1/2, "Yes", "No")
+mean(pclp==dat1$y[-train]) # 0.8490028
+
+
+
+
+# Bagging and Random forests
+
+library(MASS)
+library(caret)
+library(doParallel)
+nc=detectCores()
+registerDoParallel(nc)
+dat1$X <- NULL
+dat1 <- na.omit(dat1)
+n <- dim(dat1)[1]
+
+
+library(randomForest)
+set.seed(20196315)
+train <- sample(n, n/2)
+htrain <- dat1[train, ]
+htest <- dat1[-train, ]
+
+
+
+set.seed(20196315)
+bag.h <- randomForest(y ~ ., data = htrain, mtry = 50, importance = T)
+bag.h
+yhat.bag <- predict(bag.h, newdata = htest)
+mean(yhat.bag == htest$y) # 0.8632479
+
+
+
+set.seed(20196315)
+rf.h <- randomForest(y ~ ., data = htrain, mtry = 8, importance = T)
+rf.h
+
+yhat.rf <- predict(rf.h, newdata = htest)
+mean(yhat.rf == htest$y) # 0.8632479
+
+
+
+
+#boosting
+
+library(gbm)
+set.seed(20196315)
+n <- dim(dat1)[1]
+train <- sample(n, n/2)
+fitgbm <- gbm(y ~ ., data = dat1[train, ], cv.folds = 10,
+              n.tree = 100, distribution = "multinomial")
+best.iter <- gbm.perf(fitgbm, method = "cv")
+predgbm <- predict(fitgbm, dat1[-train, ], best.iter, type = "response")
+head(predgbm)
+pclgbm <- apply(predgbm, 1, which.max)
+table(pclgbm, dat1$y[-train])
+
+library(caret)
+
+mycontrol = trainControl(method = "cv", number = 10, savePredictions = "final",
+                         classProbs = T, allowParallel = T)
+set.seed(20196315)
+fit_gbm = train(y ~ ., data = dat1[train, ], method = "gbm",
+                trControl = mycontrol, tuneLength = 3, preProc = c("center",
+                                                                   "scale"), verbose = F)
+pred_gbm = predict(fit_gbm, dat1[-train, ])
+table(pred_gbm, dat1$y[-train])
+
+mean(pred_gbm == dat1$y[-train]) # 0.8490028
+
+
+# xgboost
+
+
+set.seed(20196315)
+library(xgboost)
+fit_xgb = train(y ~ ., data = dat1[train, ], method = "xgbTree",
+                trControl = mycontrol, tuneLength = 5, preProc = c("center",
+                                                                   "scale"), verbose = FALSE)
+# fit_xgb
+
+set.seed(20196315)
+pred_xgb = predict(fit_xgb, dat1[-train, ])
+table(pred_xgb, dat1$y[-train])
+
+mean(pred_xgb == dat1$y[-train]) # 0.8632479
+
+
+
+
+# stacking
+
+library(caret)
+library(caretEnsemble)
+library(doParallel)
+
+
+dat1 = na.omit(dat1)
+n = dim(dat1)[1]
+
+
+set.seed(20196315)
+train = sample(n, n/2)
+htrain = dat1[train, ]
+htest = dat1[-train, ]
+dim(dat1)
+
+X.train = htrain[, -51]
+X.test = htest[, -51]
+y.train = htrain[, 51]
+y.test = htest[, 51]
+my.control = trainControl(method = "cv", number = 10, savePredictions = "final",
+                          allowParallel = TRUE, classProbs = TRUE)
+
+set.seed(20196315)
+hmodel = caretList(y ~ ., data = htrain, methodList = c("rf",
+                                                        "glm", "naive_bayes"), metric = "Accuracy", trControl = my.control)
+hmodel$rf
+
+hmodel$glm
+
+
+hmodel$naive_bayes
+
+
+pc_hrf = predict.train(hmodel$rf, X.test)
+pc_hglm = predict.train(hmodel$glm, X.test)
+pc_hnb = predict.train(hmodel$naive_bayes, X.test)
+acc = function(x, y) mean(x == y)
+acc(pc_hrf, y.test)
+
+acc(pc_hglm, y.test)
+
+acc(pc_hnb, y.test)
+
+z1 = hmodel$rf$pred[order(hmodel$rf$pred$rowIndex), ]$Yes 
+#CV posterior probability with the same index order
+
+z2 = hmodel$glm$pred[order(hmodel$glm$pred$rowIndex), ]$Yes
+z3 = hmodel$naive_bayes$pred[order(hmodel$naive_bayes$pred$rowIndex),
+]$Yes
+Z.train = data.frame(z1 = z1, z2 = z2, z3 = z3)
+Z.test = data.frame(z1 = predict.train(hmodel$rf, X.test, "prob")$Yes,
+                    z2 = predict.train(hmodel$glm, X.test, "prob")$Yes, z3 =
+                      predict.train(hmodel$naive_bayes,
+                                    X.test, "prob")$Yes)
+
+set.seed(20196315)
+hens1 = caretEnsemble(hmodel, metric = "Accuracy", trControl = my.control)
+
+pc_hens1 = predict(hens1, X.test)
+acc(pc_hens1, y.test)
+
+
+res = data.frame(rf = acc(pc_hrf, y.test), glm = acc(pc_hglm,
+                                                     y.test), naive_bayes = acc(pc_hnb, y.test), stacking1 = acc(pc_hens1,y.test))
+
+
+
+
+set.seed(20196315)
+hens2 = caretStack(hmodel, method = "glmnet", metric = "Accuracy",
+                   trControl = my.control, tuneLength = 5)
+
+pc_hens2 = predict(hens2, X.test)
+acc(pc_hens2, y.test)
+
+
+res$stack_elastic_net = acc(pc_hens2, y.test)
+res
+
+
+
+
+
+#svc
+
+
+n = dim(dat1)[1]
+set.seed(20196315)
+train = sample(n, n/2)
+htrain = dat1[train, ]
+htest = dat1[-train, ]
+
+library(e1071)
+hsvc = svm(y ~ ., htrain, kernel = "linear", cost = 10)
+hsvc
+
+p = predict(hsvc, htest)
+mean(p == htest[, 51]) # 0.8490028
+
+
+
+
+#logistic regression
+
+datb<-dat1[dat1$y!="",c(1,2,5)]
+#plot(irisb[,1:2],col=irisb[,3])
+irisb$Y<-rep(0,dim(irisb)[1])
+irisb$Y[irisb$Species=="virginica"]<-1
+n<-dim(iris)[1]
+set.seed(1)
+train <- sample(n,n/2)
+fit<-glm(Y~Sepal.Length,data=irisb[train,],family=binomial)
+summary(fit)
+
+
+
+# make predictions of 100 observations at the predictor values in Adata.csv, 
+
+
+set.seed(20196315)
+yhat.rf2 <- predict(rf.h, dat2) # 3개
+
+yhat.rf3 <- predict(bag.h, dat2) # 나온다 13개
+
+yhat.rf4 <- predict(hmodel$rf, dat2)
+
+mean(pred_gbm == dat2)
+
+pred1 <- predict(prune.h,dat2)
+pred2<-predict(fit_gbm, dat2)
+pred3<-predict(res$stack_elastic_net, dat2)
+pred4<-predict(hsvc, dat2) # 나온다. 10개
+
+
+# and upload Your name.csv file by replacing NAs with your predicted values (“Yes” or “No”).
+
+write.csv(data.frame(y=yhat.rf3), file = "C:/Users/sec/Desktop/지민경/2022-1/데이터마이닝/기말/지민경.csv", row.names = F)
